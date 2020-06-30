@@ -1,0 +1,132 @@
+import numpy as np
+import sklearn
+import pandas as pd
+import random
+import sklearn.naive_bayes as naive_bayes
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import MinMaxScaler
+from sklearn import preprocessing
+import matplotlib.pyplot as plt
+
+def LostDel(Matrix):
+    m=len(Matrix)
+    n=len(Matrix[0])
+    count=np.zeros(n)
+    for i in range(n):
+        for j in range(m):
+            if Matrix[j][i]==0 : count[i]+=1
+    count=count/m
+    for i in range(n):
+        if count[i]>0.3:
+            Matrix=np.delete(Matrix,[i],axis=1)
+    return Matrix
+    
+def DataGet():
+    data=pd.read_csv('D:/lessonrelated/机器学习/voice_Recognition/voice.csv')#,dtype={''}可指定数据类型
+    a=data.values
+    m=len(a)
+    n=len(a[0])
+    Labels=np.zeros(m)
+    for i in range(m):
+        if a[i][n-1]=='male':
+            Labels[i]=1
+    Matrix=np.delete(a,-1,axis=1)#删除最后一列
+    Matrix=Matrix.astype(float)
+    Matrix=LostDel(Matrix)
+    k=Matrix.mean(axis=0)
+    for i in range(n-1):
+        for j in range(m):
+            if Matrix[j][i]==0:
+                Matrix[j][i]=k[i]
+    return train_test_split(Matrix,Labels,test_size=0.3)
+class NaiveBayes():
+    '''高斯朴素贝叶斯分类器'''
+    def __init__(self):
+        self._X_train = None
+        self._y_train = None
+        self._classes = None
+        self._priorlist = None
+        self._meanmat = None
+        self._varmat = None
+    def fit(self, X_train, y_train):
+        self._X_train = X_train
+        self._y_train = y_train
+        self._classes = np.unique(self._y_train)                       #  得到各个类别
+        priorlist = []
+        meanmat0 = np.array([np.zeros(len(X_train[0]))])
+        varmat0 = np.array([np.zeros(len(X_train[0]))])
+        for i, c in enumerate(self._classes):
+            # 计算每个种类的平均值, 方差, 先验概率
+            X_Index_c = self._X_train[np.where(self._y_train == c)]        # 属于某个类别的样本组成的 "矩阵"
+            priorlist.append(X_Index_c.shape[0] / self._X_train.shape[0])  # 计算类别的先验概率
+            X_index_c_mean = np.mean(X_Index_c, axis=0, keepdims=True)     # 计算该类别下每个特征的均值, 结果保持二维状态[[3 4 6 2 1]]
+            X_index_c_var = np.var(X_Index_c, axis=0, keepdims=True)       # 方差
+            meanmat0 = np.append(meanmat0, X_index_c_mean, axis=0)         # 各个类别下的特征均值矩阵组成新的矩阵, 每行代表一个类别.
+            varmat0 = np.append(varmat0, X_index_c_var, axis=0)
+        self._priorlist = priorlist
+        self._meanmat = meanmat0[1:, :]                                    #除去开始多余的第一行
+        self._varmat = varmat0[1:, :]
+    def predict(self,X_test):
+        eps = 1e-10                                                        # 防止分母为 0
+        classof_X_test = []                                                #用于存放测试集中各个实例的所属类别
+        for x_sample in X_test:
+            matx_sample = np.tile(x_sample,(len(self._classes),1))         #将每个实例沿列拉长, 行数为样本的类别数
+            mat_numerator = np.exp(-(matx_sample - self._meanmat) ** 2 / (2 * self._varmat + eps))
+            mat_denominator = np.sqrt(2 * np.pi * self._varmat + eps)
+            list_log = np.sum(np.log(mat_numerator/mat_denominator),axis=1)# 每个类别下的类条件概率相乘后取对数
+            prior_class_x = list_log + np.log(self._priorlist)             # 加上类先验概率的对数
+            prior_class_x_index = np.argmax(prior_class_x)                 # 取对数概率最大的索引
+            classof_x = self._classes[prior_class_x_index]                 # 返回一个实例对应的类别
+            classof_X_test.append(classof_x)
+        return classof_X_test
+    def score(self, X_test, y_test):
+        j = 0
+        k=self.predict(X_test)
+        for i in range(len(k)):
+            if k[i] == y_test[i]:
+                j += 1
+        return ('accuracy: {:.10%}'.format(j / len(y_test))
+def kindChoose(TrainMatrix,TrainLabels,TestMatrix):
+    x1,x2,y1,y2=train_test_split(TrainMatrix,TrainLabels,test_size=0.3)
+    num=len(x1[0])
+    weight=np.zeros(num)
+    for i in range(num):
+        a1=x1[:,i]
+        a1=a1.reshape((len(x1),1))
+        a2=x2[:,i]
+        a2=a2.reshape((len(x2),1))
+        clf=naive_bayes.GaussianNB()
+        clf.fit(a1,y1)
+        weight[i]=clf.score(a2,y2)
+        print(weight[i])
+    for i in range(num):
+        if weight[num-i-1]<0.8:
+            TrainMatrix=np.delete(TrainMatrix,[num-i-1],axis=1)
+            TestMatrix=np.delete(TestMatrix,[num-i-1],axis=1)
+    return TrainMatrix,TestMatrix
+
+def Gauss(TrainMatrix,TestMatrix,TrainLabels,TestLabels):
+    TrainMatrix,TestMatrix=kindChoose(TrainMatrix,TrainLabels,TestMatrix)
+    clf=naive_bayes.GaussianNB()
+    clf.fit(TrainMatrix,TrainLabels)
+    print(clf.score(TestMatrix,TestLabels))
+if __name__ == '__main__':
+    TrainMatrix,TestMatrix,TrainLabels,TestLabels=DataGet()
+    while 1:
+        print("选择功能：\n1.自己实现高斯贝叶斯\n2.sklearn的高斯贝叶斯\n5.优化高斯")
+        a=int(input("input:"))
+        print(a)
+        if a==0: break
+        elif a==1:
+            clf=NaiveBayes()
+            clf.fit(TrainMatrix,TrainLabels)
+            print(clf.score(TestMatrix,TestLabels))
+        elif a==2:
+            clf=naive_bayes.GaussianNB()
+            clf.fit(TrainMatrix,TrainLabels)
+            print(clf.score(TestMatrix,TestLabels))
+        elif a==5:
+            Gauss(TrainMatrix,TestMatrix,TrainLabels,TestLabels)
+
