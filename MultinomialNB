@@ -21,7 +21,26 @@ def LostDel(Matrix):
         if count[i]>0.3:
             Matrix=np.delete(Matrix,[i],axis=1)
     return Matrix
-
+def feature_Choose(TrainMatrix,TrainLabels,TestMatrix):#对特征选取
+    x1,x2,y1,y2=train_test_split(TrainMatrix,TrainLabels,test_size=0.3)
+    clf=naive_bayes.MultinomialNB(alpha=1.0,fit_prior=None,class_prior=None)
+    clf.fit(x1,y1)
+    acc=clf.score(x2,y2)
+    num=len(x1[0])
+    weight=np.zeros(num)
+    for i in range(num):
+        a1=np.delete(x1,[i],axis=1)
+        a2=np.delete(x2,[i],axis=1)
+        clf=naive_bayes.MultinomialNB(alpha=1.0,fit_prior=None,class_prior=None)
+        clf.fit(a1,y1)
+        weight[i]=clf.score(a2,y2)/acc
+        #print(weight[i])
+    for i in range(num):
+        if weight[num-i-1]>0.98:
+            TrainMatrix=np.delete(TrainMatrix,[num-i-1],axis=1)
+            TestMatrix=np.delete(TestMatrix,[num-i-1],axis=1)
+    return TrainMatrix,TestMatrix
+    
 def DataGet():
     data=pd.read_csv('D:/lessonrelated/机器学习/voice_Recognition/voice.csv')#,dtype={''}可指定数据类型
     a=data.values
@@ -68,6 +87,7 @@ def discretelize(TrainMatrix,TestMatrix):#离散化
     
 def MutiBayes(TrainMatrix,TestMatrix,TrainLabels,TestLabels):
     TrainMatrix,TestMatrix=discretelize(TrainMatrix,TestMatrix)
+    TrainMatrix,TestMatrix=feature_Choose(TrainMatrix,TrainLabels,TestMatrix)
     clf = naive_bayes.MultinomialNB(alpha=1.0,fit_prior=None,class_prior=None)
     clf.fit(TrainMatrix,TrainLabels)
     print(clf.score(TestMatrix,TestLabels))
